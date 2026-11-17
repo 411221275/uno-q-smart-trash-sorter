@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UNO Q AI 智慧垃圾分類系統</title>
+    <link rel="stylesheet" href="style.css?v=classroom-1" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">Arduino UNO Q｜AIoT 期末專題</p>
+        <h1>AI 智慧垃圾分類系統</h1>
+        <p class="lead">攝影機在這台筆電，AI 在 UNO Q。影像只在筆電和這塊 UNO Q 之間傳送。</p>
+      </header>
+
+      <section class="control-card" aria-labelledby="control-title">
+        <div>
+          <h2 id="control-title">1. 選擇攝影機</h2>
+          <p class="hint">可以選筆電內建攝影機，也可以選外接鏡頭。瀏覽器第一次使用時會詢問權限。</p>
+        </div>
+
+        <label for="cameraSelect">攝影機</label>
+        <select id="cameraSelect">
+          <option value="">正在尋找攝影機…</option>
+        </select>
+
+        <div class="button-row">
+          <button id="startButton" class="primary" type="button">開始辨識</button>
+          <button id="externalButton" class="secondary" type="button" title="畫面改由外部 Python 程式送，這一頁只負責顯示結果">用 Python 送</button>
+          <button id="stopButton" class="secondary" type="button" disabled>停止</button>
+        </div>
+
+        <div class="status-grid" aria-live="polite">
+          <p><span class="status-dot" id="cameraDot"></span><strong>筆電攝影機：</strong><span id="cameraStatus">尚未開始</span></p>
+          <p><span class="status-dot" id="usbDot"></span><strong>USB 影像傳送：</strong><span id="usbStatus">等待連線</span></p>
+          <p><span class="status-dot" id="frameDot"></span><strong>送出畫面：</strong><span id="frameStatus">0 張</span></p>
+        </div>
+      </section>
+
+      <section class="stats-card" aria-labelledby="stats-title">
+        <div class="stats-heading">
+          <div>
+            <p class="step">即時統計</p>
+            <h2 id="stats-title">現在跑得怎麼樣？</h2>
+          </div>
+          <p>每秒更新一次</p>
+        </div>
+
+        <div class="stats-grid" aria-live="polite">
+          <article class="stat-item">
+            <p>送出速度</p>
+            <strong id="sendFpsValue">0.0 FPS</strong>
+            <span id="boardFpsNote">每秒送到 UNO Q 的畫面數</span>
+          </article>
+          <article class="stat-item">
+            <p>USB 資料量</p>
+            <strong id="dataRateValue">0 KB/s</strong>
+            <span>目前每秒傳送的資料量</span>
+          </article>
+          <article class="stat-item">
+            <p>送出影像</p>
+            <strong id="resolutionValue">320 × 240</strong>
+            <span>實際送給 UNO Q 的大小</span>
+          </article>
+          <article class="stat-item">
+            <p>已執行</p>
+            <strong id="uptimeValue">00:00</strong>
+            <span>這次測試經過的時間</span>
+          </article>
+          <article class="stat-item">
+            <p>跳過畫面</p>
+            <strong id="skippedValue">0 張</strong>
+            <span>忙碌或斷線時沒有送出的畫面</span>
+          </article>
+          <article class="stat-item ai-stat">
+            <p>分類結果</p>
+            <strong id="aiFacesValue">等待畫面</strong>
+            <span id="aiConfidenceValue">信心度 —</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="video-grid" aria-label="攝影機畫面與 AI 辨識結果">
+        <article class="video-card">
+          <div class="card-heading">
+            <div>
+              <p class="step">2. 筆電畫面</p>
+              <h2>原始攝影機</h2>
+            </div>
+            <span class="badge">筆電</span>
+          </div>
+          <div class="video-stage local-stage">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <p id="localPlaceholder">按「開始辨識」後，畫面會出現在這裡。</p>
+          </div>
+        </article>
+
+        <article class="video-card">
+          <div class="card-heading">
+            <div>
+              <p class="step">3. UNO Q 結果</p>
+              <h2>AI 垃圾分類即時診斷面板</h2>
+            </div>
+            <span class="badge accent">UNO Q</span>
+          </div>
+          <div class="video-stage" style="background:#f8fafc;padding:20px;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:14px;text-align:left;">
+            <iframe id="aiFrame" style="display:none;"></iframe>
+            <p id="aiPlaceholder" style="display:none;"></p>
+
+            <div>
+              <div style="font-size:13px;color:#64748b;font-weight:600;margin-bottom:4px;">目前最終判定垃圾分類：</div>
+              <div id="diag-category" style="font-size:30px;font-weight:800;color:#0f172a;line-height:1.2;">等待偵測物體...</div>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <span style="background:#e2e8f0;color:#334155;padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600;">目標標籤：<b id="diag-item">-</b></span>
+              <span style="background:#dcfce7;color:#166534;padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600;">信心度：<b id="diag-conf">-</b></span>
+              <span style="background:#fef3c7;color:#92400e;padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600;">板子 LED：<b id="diag-led">READY</b></span>
+            </div>
+
+            <div style="border-top:1px solid #e2e8f0;padding-top:10px;">
+              <div style="font-size:12px;color:#64748b;margin-bottom:6px;font-weight:600;">鏡頭即時捕捉到的所有原始物件（門檻 35%）：</div>
+              <div id="diag-list" style="font-size:13px;color:#475569;font-family:monospace;line-height:1.6;max-height:110px;overflow-y:auto;">請先在上方選擇攝影機並點擊「開始辨識」</div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <aside class="privacy-note">
+        <strong>可測試物件提示：</strong>寶特瓶 (bottle)、杯子 (cup)、手機 (cell phone)、書本 (book)、水果 (apple/banana)、餐具 (spoon/fork/scissors)。
+      </aside>
+
+      <canvas id="captureCanvas" width="320" height="240" hidden></canvas>
+    </main>
+
+    <script src="libs/socket.io.min.js"></script>
+    <script src="libs/arduino.js"></script>
+    <script src="app.js?v=classroom-1"></script>
+    <script>
+      (function () {
+        function updateDiagUI(d) {
+          if (!d) return;
+          if (d.category) {
+            document.getElementById("diag-category").textContent = d.category;
+            document.getElementById("diag-item").textContent = d.item || "-";
+            document.getElementById("diag-conf").textContent = (d.confidence ?? "-") + "%";
+            document.getElementById("diag-led").textContent = d.led_text || "-";
+            const topResult = document.getElementById("aiFacesValue");
+            const topConf = document.getElementById("aiConfidenceValue");
+            if (topResult) topResult.textContent = d.led_text || d.category;
+            if (topConf) topConf.textContent = "信心度 " + (d.confidence ?? "-") + "%";
+          }
+          if (Array.isArray(d.candidates)) {
+            const listEl = document.getElementById("diag-list");
+            if (d.candidates.length === 0) {
+              listEl.innerHTML = '<span style="color:#94a3b8;">畫面中暫無信心度 > 35% 的物件</span>';
+            } else {
+              listEl.innerHTML = d.candidates.map(function (c) {
+                return c.ignored
+                  ? '<span style="color:#94a3b8;">[已忽略背景] ' + c.label + ' (' + c.confidence + '%)</span>'
+                  : '<span style="color:#0284c7;font-weight:bold;">[有效目標] ' + c.label + ' (' + c.confidence + '%)</span>';
+              }).join("<br>");
+            }
+          }
+        }
+
+        function bindEvents() {
+          if (typeof boardUi !== "undefined" && typeof boardUi.on_message === "function") {
+            boardUi.on_message("trash_result", updateDiagUI);
+            boardUi.on_message("trash_diag", updateDiagUI);
+            return true;
+          }
+          return false;
+        }
+
+        if (!bindEvents()) {
+          const timer = setInterval(function () {
+            if (bindEvents()) clearInterval(timer);
+          }, 300);
+        }
+      })();
+    </script>
+  </body>
+</html>

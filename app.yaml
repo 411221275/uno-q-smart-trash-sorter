@@ -1,0 +1,12 @@
+name: UNO Q AI Smart Trash Sorter
+icon: ♻️
+description: Real-time AI waste classification using browser camera and LED matrix display.
+
+ports:
+  - 8080
+
+bricks:
+  - arduino:video_object_detection:
+      devices:
+        - remote_camera_0
+  - arduino:web_ui
